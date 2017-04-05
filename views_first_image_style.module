@@ -1,0 +1,104 @@
+<?php
+
+/**
+ * @file
+ * Allows to display selected entity images in the view using specific image
+ * style different from default image style used for all other images.
+ *
+ * More info:
+ *   - Introduced hooks to extend field formatters and widgets with third-party
+ *     settings: https://www.drupal.org/node/2130757
+ *
+ * Similar modules:
+ *   - https://www.drupal.org/project/field_multiple_limit
+ *   - https://www.drupal.org/project/image_delta_formatter
+ */
+
+use Drupal\Core\Entity\Entity\EntityViewDisplay;
+use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FormatterInterface;
+use Drupal\Core\Form\FormStateInterface;
+
+/**
+ * Implements hook_field_formatter_third_party_settings_form().
+ */
+function views_first_image_style_field_formatter_third_party_settings_form(FormatterInterface $plugin, FieldDefinitionInterface $field_definition, $view_mode, $form, FormStateInterface $form_state) {
+  if ($plugin->getPluginId() == 'image') {
+    $options = [
+      '' => t('None (default image style)'),
+      ] + image_style_options(FALSE);
+
+    $element['image_style'] = array(
+      '#type' => 'select',
+      '#title' => t('Image style for selected images in the view'),
+      '#options' => $options,
+      '#default_value' => $plugin->getThirdPartySetting('views_first_image_style', 'image_style'),
+    );
+
+    $element['row_index'] = array(
+      '#type' => 'textfield',
+      '#title' => t('View rows to apply the style to'),
+      '#description' => t('Separate multiple values with comma.'),
+      '#default_value' => $plugin->getThirdPartySetting('views_first_image_style', 'row_index', '0'),
+      '#size' => 20,
+      '#states' => [
+        'visible' => [
+          ':input[name="fields[field_image][settings_edit_form][third_party_settings][views_first_image_style][image_style]"]' => ['!value' => ''],
+        ],
+      ],
+    );
+
+    return $element;
+  }
+}
+
+/**
+ * Implements hook_field_formatter_settings_summary_alter().
+ */
+function views_first_image_style_field_formatter_settings_summary_alter(&$summary, $context) {
+  if ($context['formatter']->getPluginId() == 'image') {
+    $image_styles = image_style_options(FALSE);
+
+    if ($image_style_setting = $context['formatter']->getThirdPartySetting('views_first_image_style', 'image_style')) {
+      $summary[] = t('Views image style: @style', array('@style' => $image_styles[$image_style_setting]));
+
+      $row_index_setting = $context['formatter']->getThirdPartySetting('views_first_image_style', 'row_index');
+      if (!is_null($row_index_setting)) {
+        $summary[] = t('Views row index: @row_index', array('@row_index' => $row_index_setting));
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_preprocess_field().
+ */
+function views_first_image_style_preprocess_field(&$variables) {
+  if ($variables['element']['#formatter'] == 'image') {
+    $entity = $variables['element']['#object'];
+    $view_mode = $variables['element']['#view_mode'];
+    $field_name = $variables['element']['#field_name'];
+
+    $entity_display = EntityViewDisplay::collectRenderDisplay($entity, $view_mode);
+    $field_display = $entity_display->getComponent($field_name);
+    $image_style = $field_display['third_party_settings']['views_first_image_style']['image_style'];
+
+    /** @var Drupal\node\Entity\Node $node */
+    $node = $variables['element']['#object'];
+
+    // We need to know current Views row index. Is there a better way?
+    foreach ($node->view->result as $delta => $result) {
+      if ($result->nid == $node->id()) {
+        $current_row = $delta;
+      }
+    }
+
+    // If current Views row is configured to use a different image style...
+    $row_indexes = explode(',', $field_display['third_party_settings']['views_first_image_style']['row_index']);
+    if (in_array($current_row, $row_indexes)) {
+      foreach ($variables['items'] as $delta => $item) {
+        $variables['items'][$delta]['content']['#image_style'] = $image_style;
+      }
+    }
+  }
+}

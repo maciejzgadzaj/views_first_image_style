@@ -1,0 +1,9 @@
+{
+    "name": "zgadzaj/views_first_image_style",
+    "type": "drupal-module",
+    "description": "Allows to display selected entity images in the view using specific image style different from default image style used for all other images.",
+    "homepage": "http://zgadzaj.com/",
+    "license": "GPL-2.0+",
+    "minimum-stability": "dev",
+    "require": {}
+}
