@@ -1,0 +1,6 @@
+name: Views First Image Style
+description: Allows to display selected entity images in the view using specific image style different from default image style used for all other images.
+type: module
+core: 8.x
+dependencies:
+  - image
